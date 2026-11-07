@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registrer Gjort Oppgave</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+</head>
+<body>
+
+    <div class="icon-bar">
+        <a href="profilSide.html"><i class="fa fa-user"></i></a> 
+        <a href="lagOppgaver.html"><i class="fa fa-plus-square"></i></a> 
+        <a href="gjortOppgave.html" class="active"><i class="fa fa-check-square"></i></a> 
+        <a href="oversikt.html"><i class="fa fa-group"></i></a>
+    </div>
+
+    <div class="oppgaveliste">
+        <h1>Gjort oppgave</h1>
+        <p>Velg oppgaven du har gjort fra listen:</p>
+
+        <form id="gjortForm">
+            <label for="oppgaveVelger">Velg oppgave:</label>
+            <select id="oppgaveVelger" onchange="visBeskrivelse()" required>
+                <!-- Fylles dynamisk fra localStorage -->
+            </select>
+
+            <!-- Viser beskrivelsen til valgt oppgave -->
+            <div id="oppgaveBeskrivelse" style="margin: 15px 0; font-style: italic; color: #555;"></div>
+
+            <button type="submit">Registrer fullført!</button>
+        </form>
+    </div>
+
+    <script>
+        function lastOppgaverTilDropdown() {
+            const dropdown = document.getElementById('oppgaveVelger');
+            const oppgaver = JSON.parse(localStorage.getItem('ryddeOppgaver')) || [];
+
+            dropdown.innerHTML = '';
+
+            if (oppgaver.length === 0) {
+                const defaultOption = document.createElement('option');
+                defaultOption.text = 'Ingen oppgaver tilgjengelig';
+                defaultOption.disabled = true;
+                defaultOption.selected = true;
+                dropdown.appendChild(defaultOption);
+                document.getElementById('oppgaveBeskrivelse').innerText = '';
+                return;
+            }
+
+            // Standard instruksjon
+            const startOption = document.createElement('option');
+            startOption.text = '-- Velg en oppgave --';
+            startOption.value = '';
+            dropdown.appendChild(startOption);
+
+            // Legger til hver oppgave fra localStorage i dropdown-menyen
+            oppgaver.forEach((oppgave, index) => {
+                const option = document.createElement('option');
+                option.value = index;
+                option.text = `${oppgave.tittel} (${oppgave.poeng} p)`;
+                dropdown.appendChild(option);
+            });
+        }
+
+        // Viser beskrivelsen til den oppgaven som for øyeblikket er valgt
+        function visBeskrivelse() {
+            const dropdown = document.getElementById('oppgaveVelger');
+            const beskrivelseFelt = document.getElementById('oppgaveBeskrivelse');
+            const valgtIndex = dropdown.value;
+
+            if (valgtIndex === "") {
+                beskrivelseFelt.innerText = '';
+                return;
+            }
+
+            const oppgaver = JSON.parse(localStorage.getItem('ryddeOppgaver')) || [];
+            const valgtOppgave = oppgaver[valgtIndex];
+
+            if (valgtOppgave && valgtOppgave.beskrivelse) {
+                beskrivelseFelt.innerText = `Beskrivelse: "${valgtOppgave.beskrivelse}"`;
+            } else {
+                beskrivelseFelt.innerText = '';
+            }
+        }
+
+        // Håndterer innsending når brukeren trykker på knappen
+        document.getElementById('gjortForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            const dropdown = document.getElementById('oppgaveVelger');
+            const valgtIndex = dropdown.value;
+
+            if (valgtIndex === "") {
+                alert("Vennligst velg en oppgave først!");
+                return;
+            }
+
+            let oppgaver = JSON.parse(localStorage.getItem('ryddeOppgaver')) || [];
+            const utførtOppgave = oppgaver[valgtIndex];
+
+            // Fjern oppgaven fra listen etter at den er registrert fullført
+            oppgaver.splice(valgtIndex, 1);
+            localStorage.setItem('ryddeOppgaver', JSON.stringify(oppgaver));
+
+            alert(`Fantastisk! Du fullførte "${utførtOppgave.tittel}" og fikk ${utførtOppgave.poeng} poeng! ⭐`);
+
+            // Tilbakestill beskrivelsen og oppdater dropdown på nytt
+            document.getElementById('oppgaveBeskrivelse').innerText = '';
+            lastOppgaverTilDropdown();
+        });
+
+        // Last inn oppgavene med en gang siden åpnes
+        lastOppgaverTilDropdown();
+    </script>
+
+</body>
+</html>
