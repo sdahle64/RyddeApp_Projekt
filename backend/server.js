@@ -13,6 +13,11 @@ app.use(express.urlencoded({ extended: true }));
 // Serverer statiske filer fra frontend-mappen
 app.use(express.static(path.join(__dirname, '../frontend')));
 
+// Send brukeren rett til index.html når man går til http://localhost:3000/
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, '../frontend/index.html'));
+});
+
 // ----------------------------------------------------
 // DATABASETILKOBLING OG TABELLER
 // ----------------------------------------------------
