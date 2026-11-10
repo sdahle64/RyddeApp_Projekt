@@ -4,21 +4,28 @@ const cors = require('cors');
 const path = require('path');
 
 const app = express();
+
+// Middleware for parsing og CORS
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Server statiske filer (HTML, CSS) fra mappen din
+// Serverer statiske filer fra frontend-mappen
 app.use(express.static(path.join(__dirname, '../frontend')));
-app.use(express.static(path.join(__dirname, '../')));
 
-// Koble til SQLite-database
-const db = new sqlite3.Database('./ryddeapp.db', (err) => {
-    if (err) console.error(err.message);
-    console.log('Tilkoblet ryddeapp.db');
+// ----------------------------------------------------
+// DATABASETILKOBLING OG TABELLER
+// ----------------------------------------------------
+// Oppretter og kobler til ryddeapp.db i backend-mappen
+const db = new sqlite3.Database(path.join(__dirname, 'ryddeapp.db'), (err) => {
+    if (err) {
+        console.error('Feil ved tilkobling til database:', err.message);
+    } else {
+        console.log('Tilkoblet ryddeapp.db');
+    }
 });
 
-// Opprett tabeller om de ikke finnes
+// Opprett tabeller automatisk hvis de ikke finnes
 db.serialize(() => {
     db.run(`CREATE TABLE IF NOT EXISTS oppgaver (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -41,36 +48,41 @@ db.serialize(() => {
     )`);
 });
 
-// 1. ENDEPUNKT FOR INNLOGGING (Ny!)
+// ----------------------------------------------------
+// API-ENDEPUNKTER
+// ----------------------------------------------------
+
+// 1. Innlogging (Legger til bruker hvis den ikke finnes)
 app.post('/api/login', (req, res) => {
     const { username } = req.body;
 
     if (!username) {
-        return res.status(400).send('Brukernavn påkrevd');
+        return res.status(400).json({ error: 'Brukernavn er påkrevd' });
     }
 
-    // Sett inn brukeren hvis den ikke finnes fra før
     const sql = `INSERT OR IGNORE INTO brukere (brukernavn) VALUES (?)`;
     db.run(sql, [username], function(err) {
-        if (err) return res.status(500).send(err.message);
-
-        // Send brukeren videre til profil/oversiktssiden etter innlogging
-        res.redirect('/frontend/profilSide.html');
+        if (err) {
+            return res.status(500).json({ error: err.message });
+        }
+        res.json({ success: true, brukernavn: username });
     });
 });
 
-// 2. Endepunkt for å legge til ny oppgave
+// 2. Legge til ny oppgave (fra lagOppgaver.html)
 app.post('/api/oppgaver', (req, res) => {
     const { tittel, poeng, beskrivelse } = req.body;
     const sql = `INSERT INTO oppgaver (tittel, poeng, beskrivelse) VALUES (?, ?, ?)`;
     
     db.run(sql, [tittel, poeng, beskrivelse], function(err) {
-        if (err) return res.status(400).json({ error: err.message });
+        if (err) {
+            return res.status(400).json({ error: err.message });
+        }
         res.json({ id: this.lastID, message: 'Oppgave lagret!' });
     });
 });
 
-// 3. Endepunkt for poeng-oversikt
+// 3. Poeng-oversikt (fra oversikt.html)
 app.get('/api/oversikt', (req, res) => {
     const sql = `
         SELECT b.brukernavn, COALESCE(SUM(o.poeng), 0) AS totale_poeng
@@ -82,12 +94,17 @@ app.get('/api/oversikt', (req, res) => {
     `;
 
     db.all(sql, [], (err, rows) => {
-        if (err) return res.status(400).json({ error: err.message });
+        if (err) {
+            return res.status(400).json({ error: err.message });
+        }
         res.json(rows);
     });
 });
 
-// Start server
-app.listen(3000, () => {
-    console.log('Server kjører på http://localhost:3000');
+// ----------------------------------------------------
+// START SERVER
+// ----------------------------------------------------
+const PORT = 3000;
+app.listen(PORT, () => {
+    console.log(`Server kjører på http://localhost:${PORT}`);
 });
