@@ -44,7 +44,27 @@
             </tbody>
         </table>
     </div>
+    
 
-    <script src="script.js"></script>
+    <script>
+        async function lastOversikt() {
+        const response = await fetch('http://localhost:3000/api/oversikt');
+        const brukere = await response.json();
+
+        const tbody = document.querySelector('table tbody');
+        tbody.innerHTML = '';
+
+        brukere.forEach(bruker => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${bruker.brukernavn}</td>
+                <td>${bruker.totale_poeng} p</td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+    lastOversikt();
+    </script>
+
 </body>
 </html>

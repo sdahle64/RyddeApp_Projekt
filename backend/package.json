@@ -1,0 +1,26 @@
+{
+  "name": "ryddeapp_projekt",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sdahle64/RyddeApp_Projekt.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/sdahle64/RyddeApp_Projekt/issues"
+  },
+  "homepage": "https://github.com/sdahle64/RyddeApp_Projekt#readme",
+  "dependencies": {
+    "cors": "^2.8.6",
+    "express": "^5.3.0",
+    "sqlite3": "^6.0.1"
+  }
+}
