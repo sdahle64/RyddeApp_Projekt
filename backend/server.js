@@ -1,101 +1,93 @@
 const express = require('express');
 const sqlite3 = require('sqlite3').verbose();
 const cors = require('cors');
+const path = require('path');
 
 const app = express();
+app.use(cors());
 app.use(express.json());
-app.use(cors()); // Tillater at HTML-sidene dine kan koble seg på
+app.use(express.urlencoded({ extended: true }));
 
-// Koble til SQLite-databasefilen
-const db = new sqlite3.Database('./database.db');
+// Server statiske filer (HTML, CSS) fra mappen din
+app.use(express.static(path.join(__dirname, '../frontend')));
+app.use(express.static(path.join(__dirname, '../')));
 
-// Opprett tabeller
+// Koble til SQLite-database
+const db = new sqlite3.Database('./ryddeapp.db', (err) => {
+    if (err) console.error(err.message);
+    console.log('Tilkoblet ryddeapp.db');
+});
+
+// Opprett tabeller om de ikke finnes
 db.serialize(() => {
-    db.run(`CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        brukernavn TEXT UNIQUE NOT NULL,
-        passord TEXT NOT NULL,
-        totale_poeng INTEGER DEFAULT 0
-    )`);
-
-    db.run(`CREATE TABLE IF NOT EXISTS tasks (
+    db.run(`CREATE TABLE IF NOT EXISTS oppgaver (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         tittel TEXT NOT NULL,
-        beskrivelse TEXT,
-        poeng INTEGER NOT NULL
+        poeng INTEGER NOT NULL,
+        beskrivelse TEXT NOT NULL
     )`);
 
-    db.run(`CREATE TABLE IF NOT EXISTS completed_tasks (
+    db.run(`CREATE TABLE IF NOT EXISTS brukere (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER,
-        task_tittel TEXT,
-        poeng_oppnaadd INTEGER,
-        dato_utfoert DATETIME DEFAULT CURRENT_TIMESTAMP
+        brukernavn TEXT UNIQUE NOT NULL
+    )`);
+
+    db.run(`CREATE TABLE IF NOT EXISTS utforte_oppgaver (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        bruker_id INTEGER,
+        oppgave_id INTEGER,
+        FOREIGN KEY(bruker_id) REFERENCES brukere(id),
+        FOREIGN KEY(oppgave_id) REFERENCES oppgaver(id)
     )`);
 });
 
-// --- API ROUTES ---
-
-// 1. Registrer / Logg inn bruker
+// 1. ENDEPUNKT FOR INNLOGGING (Ny!)
 app.post('/api/login', (req, res) => {
-    const { brukernavn, passord } = req.body;
-    db.get('SELECT * FROM users WHERE brukernavn = ?', [brukernavn], (err, user) => {
-        if (err) return res.status(500).json({ error: err.message });
-        
-        if (!user) {
-            // Finnes ikke brukeren? Opprett den automatisk
-            db.run('INSERT INTO users (brukernavn, passord) VALUES (?, ?)', [brukernavn, passord], function(err) {
-                if (err) return res.status(500).json({ error: err.message });
-                res.json({ id: this.lastID, brukernavn, totale_poeng: 0 });
-            });
-        } else {
-            // Sjekk passord
-            if (user.passord === passord) {
-                res.json(user);
-            } else {
-                res.status(401).json({ error: 'Feil passord' });
-            }
-        }
+    const { username } = req.body;
+
+    if (!username) {
+        return res.status(400).send('Brukernavn påkrevd');
+    }
+
+    // Sett inn brukeren hvis den ikke finnes fra før
+    const sql = `INSERT OR IGNORE INTO brukere (brukernavn) VALUES (?)`;
+    db.run(sql, [username], function(err) {
+        if (err) return res.status(500).send(err.message);
+
+        // Send brukeren videre til profil/oversiktssiden etter innlogging
+        res.redirect('/frontend/profilSide.html');
     });
 });
 
-// 2. Hent ufullførte oppgaver
-app.get('/api/oppgaver', (req, res) => {
-    db.all('SELECT * FROM tasks', [], (err, rows) => {
-        if (err) return res.status(500).json({ error: err.message });
-        res.json(rows);
-    });
-});
-
-// 3. Legg til ny oppgave
+// 2. Endepunkt for å legge til ny oppgave
 app.post('/api/oppgaver', (req, res) => {
     const { tittel, poeng, beskrivelse } = req.body;
-    db.run('INSERT INTO tasks (tittel, poeng, beskrivelse) VALUES (?, ?, ?)', [tittel, poeng, beskrivelse], function(err) {
-        if (err) return res.status(500).json({ error: err.message });
-        res.json({ id: this.lastID });
+    const sql = `INSERT INTO oppgaver (tittel, poeng, beskrivelse) VALUES (?, ?, ?)`;
+    
+    db.run(sql, [tittel, poeng, beskrivelse], function(err) {
+        if (err) return res.status(400).json({ error: err.message });
+        res.json({ id: this.lastID, message: 'Oppgave lagret!' });
     });
 });
 
-// 4. Registrer utført oppgave
-app.post('/api/fullfoer', (req, res) => {
-    const { userId, taskId, tittel, poeng } = req.body;
-
-    // Oppdater brukerens poeng og slett oppgaven fra oppgavelisten
-    db.serialize(() => {
-        db.run('UPDATE users SET totale_poeng = totale_poeng + ? WHERE id = ?', [poeng, userId]);
-        db.run('INSERT INTO completed_tasks (user_id, task_tittel, poeng_oppnaadd) VALUES (?, ?, ?)', [userId, tittel, poeng]);
-        db.run('DELETE FROM tasks WHERE id = ?', [taskId]);
-    });
-
-    res.json({ status: 'Suksess' });
-});
-
-// 5. Hent poengoversikt for familien
+// 3. Endepunkt for poeng-oversikt
 app.get('/api/oversikt', (req, res) => {
-    db.all('SELECT brukernavn, totale_poeng FROM users ORDER BY totale_poeng DESC', [], (err, rows) => {
-        if (err) return res.status(500).json({ error: err.message });
+    const sql = `
+        SELECT b.brukernavn, COALESCE(SUM(o.poeng), 0) AS totale_poeng
+        FROM brukere b
+        LEFT JOIN utforte_oppgaver uo ON b.id = uo.bruker_id
+        LEFT JOIN oppgaver o ON uo.oppgave_id = o.id
+        GROUP BY b.id
+        ORDER BY totale_poeng DESC
+    `;
+
+    db.all(sql, [], (err, rows) => {
+        if (err) return res.status(400).json({ error: err.message });
         res.json(rows);
     });
 });
 
-app.listen(3000, () => console.log('Server kjører på http://localhost:3000'));
+// Start server
+app.listen(3000, () => {
+    console.log('Server kjører på http://localhost:3000');
+});

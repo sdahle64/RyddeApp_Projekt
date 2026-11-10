@@ -11,23 +11,21 @@
 </head>
 <body>
 
-   <div class="login-container">
-        <h1>Innlogging Ryddeapp🦋</h1>
-        <form id="loginForm">
-            <label for="username">Brukernavn:</label>
-            <input type="text" id="username" name="username" required>
-            
-            <label for="password">Passord:</label>
-            <input type="password" id="password" name="password" required>
-            
-            <button type="submit" a href="profilSide.html">Logg inn</button>
+<div class="login-container">
+    <h1>Innlogging Ryddeapp🦋</h1>
+<form id="loginForm" action="/login" method="POST">
+    <label for="username">Brukernavn:</label>
+    <input type="text" id="username" name="username" required>
 
-          <button><a href="/frontend/profilSide.html">Imidlertidig knapp for å komme på siden</a></button>
-        </form>
-    </div>
+    <label for="password">Passord:</label>
+    <input type="password" id="password" name="password" required>
+
+    <button type="submit">Logg inn</button>
+</form>
+</div>
 
 
 
-    <script src="script.js"></script>    
+   <script src="/frontend/script.js"></script>   
 </body>
 </html>
