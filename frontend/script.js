@@ -3,6 +3,7 @@ function innlogging(event) {
     event.preventDefault(); // Hindrer at siden laster på nytt
     
     const brukernavn = document.getElementById('username').value;
+
     
     // Send brukernavnet til backend (server.js)
     fetch('http://localhost:3000/api/login', {
@@ -23,7 +24,7 @@ function innlogging(event) {
 
 // 2. Hente og vise poeng-oversikten (brukes f.eks. på oversikt.html)
 function lasterInnOversikt() {
-    fetch('http://localhost:3000/api/oversikt')
+    fetch('/api/oversikt')
         .then(res => res.json())
         .then(data => {
             console.log('Poeng-oversikt fra databasen:', data);
@@ -31,3 +32,5 @@ function lasterInnOversikt() {
         })
         .catch(err => console.error('Feil ved henting av oversikt:', err));
 }
+
+// Funksjon som laster inn oppgaver

@@ -41,7 +41,8 @@ db.serialize(() => {
 
     db.run(`CREATE TABLE IF NOT EXISTS brukere (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        brukernavn TEXT UNIQUE NOT NULL
+        brukernavn TEXT UNIQUE NOT NULL,
+        passord TEXT NOT NULL
     )`);
 
     db.run(`CREATE TABLE IF NOT EXISTS utforte_oppgaver (
@@ -87,7 +88,33 @@ app.post('/api/oppgaver', (req, res) => {
     });
 });
 
-// 3. Poeng-oversikt (fra oversikt.html)
+
+// 3. Hente oppgaver for å registrere utførte oppgaver
+app.get('/api/oppgaver', (req, res) => {
+    const sql = `SELECT * FROM oppgaver`;
+    db.all(sql, [], (err, rows) => {
+        if (err) {
+            return res.status(400).json({ error: err.message });
+        }
+        res.json(rows);
+    });
+});
+
+// 4. Registrere utførte oppgaver
+app.post('/api/utførte-oppgaver', (req, res) => {
+    const { bruker_id, oppgave_id } = req.body;
+    const sql = `INSERT INTO utforte_oppgaver (bruker_id, oppgave_id) VALUES (?, ?)`;
+
+    db.run(sql, [bruker_id, oppgave_id], function(err) {
+        if (err) {
+            return res.status(400).json({ error: err.message });
+        }
+        res.json({ id: this.lastID, message: 'Utført oppgave registrert!' });
+    });
+});
+
+
+// 5. Poeng-oversikt (fra oversikt.html)
 app.get('/api/oversikt', (req, res) => {
     const sql = `
         SELECT b.brukernavn, COALESCE(SUM(o.poeng), 0) AS totale_poeng
