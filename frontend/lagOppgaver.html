@@ -34,28 +34,7 @@
         </form>
     </div>
 
-<script>
-    document.getElementById('oppgaveForm').addEventListener('submit', async function(e) {
-        e.preventDefault();
-
-        const data = {
-            tittel: document.getElementById('oppgave').value,
-            poeng: Number(document.getElementById('poeng').value),
-            beskrivelse: document.getElementById('beskrivelse').value
-        };
-
-        const response = await fetch('http://localhost:3000/api/oppgaver', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
-        });
-
-        if (response.ok) {
-            alert('Oppgaven er lagret i databasen!');
-            this.reset();
-        }
-    });
-</script>
-
+<script src="script.js"></script>
+</body>
 </body>
 </html>
