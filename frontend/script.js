@@ -1,180 +1,236 @@
-// ==========================================
-// 1. INNLOGGING (index.html)
-// ==========================================
-function innlogging(event) {
-    event.preventDefault();
-    const brukernavn = document.getElementById('username').value;
-    const passord = document.getElementById('password').value;
-
-    fetch('http://localhost:3000/api/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: brukernavn, password: passord })
-    })
-    .then(res => res.json())
-    .then(data => {
-        if (data.success) {
-            localStorage.setItem('innloggetBruker', data.brukernavn);
-            localStorage.setItem('brukerId', data.id);
-            window.location.href = 'profilSide.html';
-        } else {
-            alert(data.error || 'Feil brukernavn eller passord!');
-        }
-    })
-    .catch(err => console.error('Feil ved innlogging:', err));
+const erPaInnlogging = document.getElementById('loginForm');
+if (!erPaInnlogging && !localStorage.getItem('brukerId')) {
+    window.location.href = 'index.html';
 }
+const express = require('express');
+const sqlite3 = require('sqlite3').verbose();
+const cors = require('cors');
+const bcrypt = require('bcrypt');
+const path = require('path');
 
-// ==========================================
-// 2. OPPRETT NY OPPGAVE (lagOppgaver.html)
-// ==========================================
-const oppgaveForm = document.getElementById('oppgaveForm');
-if (oppgaveForm) {
-    oppgaveForm.addEventListener('submit', async function(e) {
-        e.preventDefault();
+const app = express();
+const PORT = 3000;
 
-        const data = {
-            tittel: document.getElementById('oppgave').value,
-            poeng: Number(document.getElementById('poeng').value),
-            beskrivelse: document.getElementById('beskrivelse').value
-        };
+// Middleware
+app.use(cors());
+app.use(express.json());
 
-        const response = await fetch('http://localhost:3000/api/oppgaver', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
-        });
-
-        if (response.ok) {
-            alert('Oppgaven er lagret i databasen!');
-            this.reset();
-        }
-    });
-}
-
-// ==========================================
-// 3. REGISTRER GJORT OPPGAVE (gjortOppgave.html)
-// ==========================================
-const gjortForm = document.getElementById('gjortForm');
-let alleOppgaver = [];
-
-async function lastOppgaverTilDropdown() {
-    const dropdown = document.getElementById('oppgaveVelger');
-    if (!dropdown) return;
-
-    try {
-        const response = await fetch('http://localhost:3000/api/oppgaver');
-        alleOppgaver = await response.json();
-
-        dropdown.innerHTML = '';
-
-        if (alleOppgaver.length === 0) {
-            const defaultOption = document.createElement('option');
-            defaultOption.text = 'Ingen oppgaver tilgjengelig';
-            defaultOption.disabled = true;
-            defaultOption.selected = true;
-            dropdown.appendChild(defaultOption);
-            document.getElementById('oppgaveBeskrivelse').innerText = '';
-            return;
-        }
-
-        const startOption = document.createElement('option');
-        startOption.text = '-- Velg en oppgave --';
-        startOption.value = '';
-        dropdown.appendChild(startOption);
-
-        alleOppgaver.forEach(oppgave => {
-            const option = document.createElement('option');
-            option.value = oppgave.id;
-            option.text = `${oppgave.tittel} (${oppgave.poeng} p)`;
-            dropdown.appendChild(option);
-        });
-    } catch (err) {
-        console.error('Feil ved henting av oppgaver:', err);
+// Koble til SQLite-databasen (ryddeapp.db ligger i samme mappe som server.js)
+const dbPath = path.join(__dirname, 'ryddeapp.db');
+const db = new sqlite3.Database(dbPath, (err) => {
+    if (err) {
+        console.error('Feil ved tilkobling til databasen:', err.message);
+    } else {
+        console.log('Koblet til SQLite-databasen ryddeapp.db');
+        // Aktiverer støtte for Foreign Keys i SQLite
+        db.run('PRAGMA foreign_keys = ON');
     }
-}
+});
 
-function visBeskrivelse() {
-    const dropdown = document.getElementById('oppgaveVelger');
-    const beskrivelseFelt = document.getElementById('oppgaveBeskrivelse');
-    if (!dropdown || !beskrivelseFelt) return;
+// ==========================================
+// 1. INNLOGGING (POST /api/login)
+// ==========================================
+app.post('/api/login', (req, res) => {
+    const { username, password } = req.body;
 
-    const valgtId = Number(dropdown.value);
-    if (!valgtId) {
-        beskrivelseFelt.innerText = '';
-        return;
+    if (!username || !password) {
+        return res.status(400).json({ success: false, error: 'Fyll inn brukernavn og passord.' });
     }
 
-    const valgtOppgave = alleOppgaver.find(o => o.id === valgtId);
-    beskrivelseFelt.innerText = (valgtOppgave && valgtOppgave.beskrivelse)
-        ? `Beskrivelse: "${valgtOppgave.beskrivelse}"`
-        : '';
-}
-
-if (gjortForm) {
-    lastOppgaverTilDropdown();
-
-    gjortForm.addEventListener('submit', async function(e) {
-        e.preventDefault();
-
-        const dropdown = document.getElementById('oppgaveVelger');
-        const oppgaveId = Number(dropdown.value);
-        const brukerId = localStorage.getItem('brukerId');
-
-        if (!oppgaveId) {
-            alert("Vennligst velg en oppgave først!");
-            return;
+    db.get('SELECT * FROM brukere WHERE brukernavn = ?', [username], async (err, bruker) => {
+        if (err) {
+            return res.status(500).json({ success: false, error: 'Databasefeil.' });
         }
-
-        if (!brukerId) {
-            alert("Du må logge inn først!");
-            window.location.href = 'index.html';
-            return;
+        if (!bruker) {
+            return res.status(401).json({ success: false, error: 'Feil brukernavn eller passord.' });
         }
 
         try {
-            const response = await fetch('http://localhost:3000/api/utforte-oppgaver', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    bruker_id: Number(brukerId),
-                    oppgave_id: oppgaveId
-                })
-            });
-
-            if (response.ok) {
-                const utfortOppgave = alleOppgaver.find(o => o.id === oppgaveId);
-                alert(`Fantastisk! Du fullførte "${utfortOppgave.tittel}" og fikk ${utfortOppgave.poeng} poeng! ⭐`);
-                document.getElementById('oppgaveBeskrivelse').innerText = '';
-                dropdown.value = '';
+            // Sjekker først om passordet i databasen er hashet med bcrypt (starter med $2)
+            let riktigPassord = false;
+            if (bruker.passord && bruker.passord.startsWith('$2')) {
+                riktigPassord = await bcrypt.compare(password, bruker.passord);
             } else {
-                alert("Noe gikk galt ved lagring av poeng.");
+                // Fallback hvis du har lagret passord i klartekst under testing
+                riktigPassord = (password === bruker.passord);
             }
-        } catch (err) {
-            console.error('Feil ved registrering:', err);
+
+            if (riktigPassord) {
+                res.json({
+                    success: true,
+                    id: bruker.id,
+                    brukernavn: bruker.brukernavn
+                });
+            } else {
+                res.status(401).json({ success: false, error: 'Feil brukernavn eller passord.' });
+            }
+        } catch (error) {
+            console.error('Feil ved passordsjekk:', error);
+            res.status(500).json({ success: false, error: 'Serverfeil ved innlogging.' });
         }
     });
-}
+});
 
 // ==========================================
-// 4. POENG-OVERSIKT (oversikt.html)
+// 2. HENT ALLE OPPGAVER (GET /api/oppgaver)
 // ==========================================
-async function lastOversikt() {
-    const tbody = document.querySelector('.tabell-container table tbody');
-    if (!tbody) return;
-
-    const response = await fetch('http://localhost:3000/api/oversikt');
-    const brukere = await response.json();
-
-    tbody.innerHTML = '';
-
-    brukere.forEach(bruker => {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-            <td>${bruker.brukernavn}</td>
-            <td>${bruker.totale_poeng} p</td>
-        `;
-        tbody.appendChild(tr);
+app.get('/api/oppgaver', (req, res) => {
+    db.all('SELECT id, tittel, poeng, beskrivelse FROM oppgaver', [], (err, rows) => {
+        if (err) {
+            return res.status(500).json({ error: err.message });
+        }
+        res.json(rows);
     });
+});
+
+// ==========================================
+// 3. OPPRETT NY OPPGAVE (POST /api/oppgaver)
+// ==========================================
+app.post('/api/oppgaver', (req, res) => {
+    const { tittel, poeng, beskrivelse } = req.body;
+
+    if (!tittel || !poeng) {
+        return res.status(400).json({ error: 'Tittel og poeng er påkrevd.' });
+    }
+
+    const sql = 'INSERT INTO oppgaver (tittel, poeng, beskrivelse) VALUES (?, ?, ?)';
+    db.run(sql, [tittel, poeng, beskrivelse || ''], function(err) {
+        if (err) {
+            return res.status(500).json({ error: err.message });
+        }
+        res.status(201).json({
+            id: this.lastID,
+            tittel,
+            poeng,
+            beskrivelse
+        });
+    });
+});
+
+// ==========================================
+// 4. REGISTRER GJORT OPPGAVE (POST /api/utforte-oppgaver)
+// ==========================================
+app.post('/api/utforte-oppgaver', (req, res) => {
+    const { bruker_id, oppgave_id } = req.body;
+
+    if (!bruker_id || !oppgave_id) {
+        return res.status(400).json({ error: 'Mangler bruker_id eller oppgave_id.' });
+    }
+
+    // registrert_dato settes automatisk av databasen (Default value)
+    const sql = 'INSERT INTO utforte_oppgaver (bruker_id, oppgave_id) VALUES (?, ?)';
+    db.run(sql, [bruker_id, oppgave_id], function(err) {
+        if (err) {
+            return res.status(500).json({ error: err.message });
+        }
+        res.status(201).json({
+            success: true,
+            id: this.lastID
+        });
+    });
+});
+
+// ==========================================
+// 5. POENG-OVERSIKT SISTE 7 DAGER (GET /api/oversikt)
+// ==========================================
+app.get('/api/oversikt', (req, res) => {
+    const sql = `
+        SELECT 
+            brukere.brukernavn, 
+            COALESCE(SUM(oppgaver.poeng), 0) AS totale_poeng
+        FROM brukere
+        LEFT JOIN utforte_oppgaver 
+            ON brukere.id = utforte_oppgaver.bruker_id 
+            AND utforte_oppgaver.registrert_dato >= datetime('now', '-7 days', 'localtime')
+        LEFT JOIN oppgaver 
+            ON utforte_oppgaver.oppgave_id = oppgaver.id
+        GROUP BY brukere.id, brukere.brukernavn
+        ORDER BY totale_poeng DESC
+    `;
+
+    db.all(sql, [], (err, rows) => {
+        if (err) {
+            return res.status(500).json({ error: err.message });
+        }
+        res.json(rows);
+    });
+});
+
+// ==========================================
+// 6. MIN PROFIL & MINE OPPGAVER (profilSide.html)
+// ==========================================
+async function lastMineOppgaver() {
+    const tabellBody = document.getElementById('mineOppgaverListe');
+    if (!tabellBody) return; // Kjører bare hvis vi er på profilSide.html
+
+    const brukerId = localStorage.getItem('brukerId');
+    const brukernavn = localStorage.getItem('innloggetBruker');
+
+    if (!brukerId) {
+        window.location.href = 'index.html';
+        return;
+    }
+
+    // Oppdaterer overskriften med navnet ditt
+    const tittel = document.getElementById('profilTittel');
+    if (tittel && brukernavn) {
+        tittel.innerText = `Profilen til ${brukernavn} 🦋`;
+    }
+
+    try {
+        const response = await fetch(`http://localhost:3000/api/mine-oppgaver/${brukerId}`);
+        const mineOppgaver = await response.json();
+
+        tabellBody.innerHTML = '';
+        let totalPoeng = 0;
+
+        if (mineOppgaver.length === 0) {
+            tabellBody.innerHTML = `
+                <tr>
+                    <td colspan="3" style="text-align: center; color: #777;">Du har ikke registrert noen oppgaver enda!</td>
+                </tr>
+            `;
+            return;
+        }
+
+        mineOppgaver.forEach(oppgave => {
+            totalPoeng += oppgave.poeng;
+
+            // Kutter bort klokkeslettet hvis registrert_dato er "2026-11-26 13:24:00"
+            const penDato = oppgave.registrert_dato ? oppgave.registrert_dato.split(' ')[0] : '';
+
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${oppgave.tittel}</td>
+                <td><strong>${oppgave.poeng} p</strong></td>
+                <td>${penDato}</td>
+            `;
+            tabellBody.appendChild(tr);
+        });
+
+        // Oppdaterer totalsummen øverst på profilen
+        const poengElement = document.getElementById('mineTotalePoeng');
+        if (poengElement) {
+            poengElement.innerText = `${totalPoeng} poeng`;
+        }
+
+    } catch (err) {
+        console.error('Feil ved henting av mine oppgaver:', err);
+    }
 }
 
-lastOversikt();
+// ==========================================
+// LOGG UT
+// ==========================================
+function loggUt() {
+    localStorage.removeItem('innloggetBruker');
+    localStorage.removeItem('brukerId');
+    window.location.href = 'index.html';
+}
+
+lastMineOppgaver();
+
+// Start serveren
+app.listen(PORT, () => {
+    console.log(`Serveren kjører på http://localhost:${PORT}`);
+});

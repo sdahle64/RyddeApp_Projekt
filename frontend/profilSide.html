@@ -16,9 +16,25 @@
         <a href="oversikt.html"><i class="fa fa-group"></i></a>
     </div>
 
-    <div class="login-container">
-        <h1>Din profil</h1>
-        <p>Velkommen til din profilside! Her kan du se og administrere dine oppgaver.</p>
+ <div class="login-container">
+        <h1 id="profilTittel">Din profil 🦋</h1>
+        <p>Totalt opptjent: <strong id="mineTotalePoeng">0 p</strong></p>
+
+        <h3>Dine fullførte oppgaver:</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Oppgave</th>
+                    <th>Poeng</th>
+                    <th>Dato</th>
+                </tr>
+            </thead>
+            <tbody id="mineOppgaverListe">
+                <!-- Fylles automatisk av script.js -->
+            </tbody>
+        </table>
+
+        <button onclick="loggUt()" class="logout-btn">Logg ut</button>
     </div>
 
     <script src="script.js"></script>    

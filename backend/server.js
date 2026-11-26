@@ -147,6 +147,32 @@ app.get('/api/oversikt', (req, res) => {
     });
 });
 
+
+// ==========================================
+// 6. MINE UTFØRTE OPPGAVER (GET /api/mine-oppgaver/:brukerId)
+// ==========================================
+app.get('/api/mine-oppgaver/:brukerId', (req, res) => {
+    const brukerId = req.params.brukerId;
+
+    const sql = `
+        SELECT 
+            oppgaver.tittel, 
+            oppgaver.poeng, 
+            utforte_oppgaver.registrert_dato
+        FROM utforte_oppgaver
+        JOIN oppgaver ON utforte_oppgaver.oppgave_id = oppgaver.id
+        WHERE utforte_oppgaver.bruker_id = ?
+        ORDER BY utforte_oppgaver.registrert_dato DESC
+    `;
+
+    db.all(sql, [brukerId], (err, rows) => {
+        if (err) {
+            return res.status(500).json({ error: err.message });
+        }
+        res.json(rows);
+    });
+});
+
 // ----------------------------------------------------
 // START SERVER
 // ----------------------------------------------------
